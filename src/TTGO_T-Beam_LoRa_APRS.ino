@@ -89,11 +89,15 @@ uint32_t RemoteDebugNr = 0L;
   #define SPI_rst 12
   #define SPI_busy 13
 #else
+  // https://github.com/meshtastic/firmware/blob/master/variants/tbeam/variant.h
   #define SPI_sck 5
   #define SPI_miso 19
   #define SPI_mosi 27
   #define SPI_ss 18
-  #define SPI_irq 26
+  //#define SPI_irq 26 // DIO0 possibly not connected
+  #define SPI_irq 33 // DIO1
+  #define SPI_rst 23 // RESET
+  #define SPI_busy 32 // BUSY
 #endif
 
 // IO config
@@ -612,6 +616,8 @@ static const adc_unit_t unit = ADC_UNIT_1;
 #elif HAS_SX126X
   #if defined(HELTEC_WIRELESS_TRACKER)
     SX1262 radio = new Module(SPI_ss, SPI_irq, SPI_rst, SPI_busy);
+  #elif HAS_SX1268
+    SX1268 radio = new Module(SPI_ss, SPI_irq, SPI_rst);
   #endif
   #define LORA_MAX_MESSAGE_LEN 255-4 // 255 byte chip buffer - header
 #else
@@ -714,6 +720,7 @@ void do_serial_println(const String &msg)
 
 #ifdef HAS_SX126X
 void signal_new_packet_received() {
+  Serial.println("LoRa packet received (interrupt)");
   flag_lora_packet_available = true;
 }
 #endif
@@ -1469,6 +1476,7 @@ void loraSend(byte lora_LTXPower, float lora_FREQ, ulong lora_SPEED, uint8_t fla
           #endif
       ) {
     #ifdef HAS_SX126X
+      Serial.printf("Radio sleep\r\n");
       radio.sleep();
     #endif
     #ifdef T_BEAM_V1_0
@@ -1478,6 +1486,7 @@ void loraSend(byte lora_LTXPower, float lora_FREQ, ulong lora_SPEED, uint8_t fla
     #endif
   } else {
     #ifdef HAS_SX126X
+      Serial.printf("Radio listen\r\n");
       radio.standby();
       radio.startReceive();
     #endif
@@ -4081,11 +4090,15 @@ void setup_phase2_soft_reconfiguration(boolean runtime_reconfiguration) {
       #endif
       axp.disableALDO2();                           // switch LoRa chip off
     }
-  #elif HAS_SX126X
+  #endif
+
+  #if HAS_SX126X
     if (lora_rx_enabled || lora_digipeating_mode > 0) {
+      Serial.printf("Radio listen\r\n");
       radio.standby();
       radio.startReceive();
     } else {
+      Serial.printf("Radio sleep\r\n");
       radio.sleep();
     }
   #endif
@@ -4163,6 +4176,7 @@ void setup_phase2_soft_reconfiguration(boolean runtime_reconfiguration) {
     radio.setCurrentLimit(140);
 
     radio.setDio1Action(signal_new_packet_received);
+    Serial.printf("Radio listen\r\n");
     radio.startReceive();
   #endif
   flag_lora_packet_available = false;
@@ -7355,6 +7369,7 @@ invalid_packet:
             flag_lora_packet_available = false;
           }
           radio.setFrequency(lora_freq_rx_curr);
+          Serial.printf("Radio listen\r\n");
           radio.startReceive();
         #endif
         sema_lock_or_unlock__lora(0);

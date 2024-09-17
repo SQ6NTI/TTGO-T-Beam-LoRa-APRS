@@ -15,6 +15,8 @@
   #include <RadioLib.h>
   #if defined(HELTEC_WIRELESS_TRACKER)
     extern SX1262 radio;
+  #elif HAS_SX1268
+    extern SX1268 radio;
   #endif
 #endif
 
